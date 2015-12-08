@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<head>
+    <meta charset="UTF-8">
+    <title>翻译</title>
+    <script type="text/javascript" src="{{ url_for('static', filename='update_tran.js') }} " charset="utf-8"></script>
+</head>
+<body>
+<h1>hello,{{ dic["en_text"] }}</h1>
+<p1>yes,{{ dic["zh_text"] }}</p1>
+<input type="button" onclick="display_en()" value="显示警告框" />
+</body>
+</html>
