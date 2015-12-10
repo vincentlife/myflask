@@ -64,12 +64,12 @@ class DB(object):
             sql_passwd = "gene_ac252"
         if self._sock_file != '':
             self.conn = MySQLdb.connect(host=self.host, port=3306, user=sql_user,
-                                        passwd='btlc123', db='test', charset='utf8',
+                                        passwd='btlc123', db='clinic', charset='utf8',
                                         unix_socket=self._sock_file)
             self.cursor = self.conn.cursor()
         else:
             self.conn = MySQLdb.connect(host=self.host, port=3306, user=sql_user,
-                                        passwd=sql_passwd, db='test', charset='utf8')
+                                        passwd=sql_passwd, db='clinic', charset='utf8')
             self.cursor = self.conn.cursor()
 
         self.conn.autocommit(True)
