@@ -4,4 +4,5 @@
 # IntelliJ project files
 .idea/*
 *.pyc
+*.txt
 # Created by .ignore support plugin (hsz.mobi)
