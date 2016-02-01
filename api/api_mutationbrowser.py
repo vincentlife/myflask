@@ -10,14 +10,13 @@ ACCESSID = "QFmrMPB18qNx9KYc"
 ACCESSKEY = "IuAdh4qL9noDf0UnMOO977HSgZSc0E"
 INSTANCENAME = "samplechr"
 TABLE_NAME = "sample_chr_info"
+REF_TABLE = "ref_seq"
 
 ots_client = OTSClient(ENDPOINT, ACCESSID, ACCESSKEY, INSTANCENAME)
 
 binOffsets = [512+64+8+1, 64+8+1, 8+1, 1, 0]
 binFirstShift = 17
 binNextShift = 3
-# file = 'test_reads1.txt'
-fwp = open('results.txt', 'w')
 
 # 获得表的信息
 def DescribeTable(table_name):
@@ -29,6 +28,27 @@ def DescribeTable(table_name):
     print u'最后一次上调预留读写吞吐量时间：%s' % describe_response.reserved_throughput_details.last_increase_time
     print u'最后一次下调预留读写吞吐量时间：%s' % describe_response.reserved_throughput_details.last_decrease_time
     print u'UTC自然日内总的下调预留读写吞吐量次数：%s' % describe_response.reserved_throughput_details.number_of_decreases_today
+
+
+def init_bin(start, end):
+    '''
+    根据range生成binlist
+    :param start: int型
+    :param end:  int型
+    :return: bin_list
+    '''
+    startBin = start - 1
+    endBin = end - 1
+    startBin >>= binFirstShift
+    endBin >>= binFirstShift
+    bin_list = []
+    for i in range(len(binOffsets)):
+        bin_list.extend([binOffsets[i] + startBin, binOffsets[i] + endBin])
+        startBin >>= binNextShift
+        endBin >>= binNextShift
+    bin_set = set(bin_list)
+    bin_list = list(bin_set)
+    return bin_list
 
 
 def GetRange(table_name):
@@ -56,60 +76,55 @@ def GetRange(table_name):
     print u'下次开始的主键：%s' % next_start_primary_key
     print len(row_list)
 
-def GetBinReads(table_name,sample_no_chr,bin_no):
-    """
+
+def GetBinReads(sample_no_chr, bin_no):
+    '''
     将指定主键范围内的数据返回给应用程序。
+    :param sample_no_chr:
+    :param bin_no:
     :return:
-    """
+    '''
     # 查询区间：[(1, INF_MIN), (4, INF_MAX))，左闭右开。
     #print sample_no_chr
     inclusive_start_primary_key = {'sample_no_chr': int(sample_no_chr), 'bin_no': bin_no, 'qname': INF_MIN, 'flag': INF_MIN}
     exclusive_end_primary_key = {'sample_no_chr': int(sample_no_chr), 'bin_no': bin_no, 'qname': INF_MAX, 'flag': INF_MAX}
     columns_to_get = ['bin_no', 'attribute_qname', 'start', 'end', 'cigar', 'seq', 'row_no','strand','attribute_flag']
     consumed, next_start_primary_key, row_list = ots_client.get_range(
-                table_name, 'FORWARD',
+                TABLE_NAME, 'FORWARD',
                 inclusive_start_primary_key, exclusive_end_primary_key,
                 columns_to_get, 1000
     )
     return row_list
 
-# 根据range生成binlist
-def one_bin(start, end):
-    startBin = start - 1
-    endBin = end - 1
-    startBin >>= binFirstShift
-    endBin >>= binFirstShift
-    bin_list = []
-    for i in range(len(binOffsets)):
-        bin_list.extend([binOffsets[i] + startBin, binOffsets[i] + endBin])
-        startBin >>= binNextShift
-        endBin >>= binNextShift
-    bin_set = set(bin_list)
-    bin_list = list(bin_set)
-    return bin_list
+def read2dic(item):
+    read_dic = {}
+    read_dic["QNAME"] = item[0]
+    read_dic["CIGAR"] = item[2]
+    read_dic["strand"] = item[3]
+    read_dic["start"] = item[4]
+    read_dic["end"] = item[5]
+    return read_dic
 
 
 def query_reads(sample_no, chr, start, end):
-    bin_list = one_bin(start, end)
+    bin_list = init_bin(start, end)
     reads_list = []
     sample_no_chr =str(sample_no) + str(chr).zfill(2)
+    # 获取range包含的所有bin中的reads
     for bin_no in bin_list:
-        row_list = GetBinReads(TABLE_NAME, sample_no_chr, bin_no)
+        row_list = GetBinReads(sample_no_chr, bin_no)
         for row in row_list:
             attribute_columns = row[1]
-            rstart = attribute_columns.get('start')
-            rend = attribute_columns.get('end')
+            rstart = int(attribute_columns.get('start'))
+            rend = int(attribute_columns.get('end'))
             qname = attribute_columns.get('attribute_qname')
             mate = attribute_columns.get('seq')
             cigar = attribute_columns.get('cigar')
             strand = attribute_columns.get('strand')
             if int(rstart) <= int(end) and int(rend) >= int(start):
                 reads_list.append([qname, mate, cigar, strand, rstart, rend])
-    return reads_list
 
-
-def GetLevel(sample_no, chr, start, end):
-    reads_list = query_reads(sample_no, chr, start, end)
+    # 对reads_list 进行排序并得出level
     sort_reads = sorted(reads_list, key=itemgetter(4, 5))#start,end整形
     level_list = []
     level_list.append([sort_reads[0]])
@@ -122,38 +137,53 @@ def GetLevel(sample_no, chr, start, end):
             elif j+1 == len(level_list):
                 level_list.append([sort_reads[i]])
                 break
-    #total = time.time() - begin
-    #print level_dict
-    print level_list
+    # 整理格式
+    result_list = []
     for level in level_list:
+        lev_list = []
         for item in level:
-            #print item
-            fwp.write(item[-2])
-            fwp.write(item[1])
-            fwp.write(item[-1])
-            fwp.write('\t')
-        fwp.write('\n')
-    fwp.close()
-    # for i in range(len(level_dict[key])):
-    #     length = int(level_dict[key][i][-1]) - int(level_dict[key][i][-2]) - 1
-    #     fwp.write(str(level_dict[key][i][1]))
-    #     for j in range(length):
-    #         fwp.write('*')
-    #     fwp.write(str(level_dict[key][i][2]))
-    #     if i<len(level_dict[key])-1:
-    #         length2 = int(level_dict[key][i+1][1]) - int(level_dict[key][i][2]) + 1
-    #         for k in range(length2):
-    #             fwp.write('_')
-    # fwp.write('\n')
-    return level_list
+            lev_list.append(read2dic(item))
+        result_list.append(lev_list)
+    return result_list
+
+
+def query_ref(chr, start, end):
+    '''
+    根据范围返回参考序列
+    :param sample_no:
+    :param chr:
+    :param start:
+    :param end:
+    :return:
+    '''
+    s_index_no = start/3000
+    e_index_no = end/3000
+    result_list = []
+    for index in range(s_index_no, e_index_no+1):
+        inclusive_start_primary_key = {'chr_no': str(chr), 'index_no': str(index)}
+        exclusive_end_primary_key = {'chr_no': str(chr), 'index_no': str(index)}
+        columns_to_get = ['start', 'seq']
+        consumed, next_start_primary_key, row_list = ots_client.get_range(
+                REF_TABLE, 'FORWARD',
+                inclusive_start_primary_key, exclusive_end_primary_key,
+                columns_to_get, 26
+        )
+        print "next_start_primary_key %s " % next_start_primary_key
+        print len(row_list)
+        for row in row_list:
+            attribute_columns = row[1]
+            start = attribute_columns.get('start')
+            seq = attribute_columns.get('seq')
+            print seq
+            result_list.append(seq)
+    return result_list
 
 
 if __name__ == '__main__':
     sample_no = 7
     chr = 13
     start = 19254500
-    end =   19255700
-    level_dict = GetLevel(sample_no, chr, start, end)
-    #list = query_reads(sample_no,chr,start,end)
-    # print "-------------------------------"
-    # print ("len(list)",len(list))
+    end = 19255700
+    # reads_list = query_reads(sample_no, chr, start, end)
+    # print reads_list
+    query_ref(chr, start, end)
