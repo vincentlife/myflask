@@ -4,6 +4,7 @@ __author__ = 'wubo'
 
 from ots2 import *
 from operator import itemgetter
+import json
 
 ENDPOINT = "http://samplechr.cn-beijing.ots.aliyuncs.com/"
 ACCESSID = "QFmrMPB18qNx9KYc"
@@ -158,25 +159,21 @@ def query_ref(chr, start, end):
     '''
     s_index_no = start/3000
     e_index_no = end/3000
+    inclusive_start_primary_key = {'chr_no': str(chr), 'index_no': str(s_index_no)}
+    exclusive_end_primary_key = {'chr_no': str(chr), 'index_no': str(e_index_no+1)}
+    columns_to_get = ['seq']
+    consumed, next_start_primary_key, row_list = ots_client.get_range(
+            REF_TABLE, 'FORWARD',
+            inclusive_start_primary_key, exclusive_end_primary_key,
+            columns_to_get
+    )
     result_list = []
-    for index in range(s_index_no, e_index_no+1):
-        inclusive_start_primary_key = {'chr_no': str(chr), 'index_no': str(index)}
-        exclusive_end_primary_key = {'chr_no': str(chr), 'index_no': str(index)}
-        columns_to_get = ['start', 'seq']
-        consumed, next_start_primary_key, row_list = ots_client.get_range(
-                REF_TABLE, 'FORWARD',
-                inclusive_start_primary_key, exclusive_end_primary_key,
-                columns_to_get, 26
-        )
-        print "next_start_primary_key %s " % next_start_primary_key
-        print len(row_list)
-        for row in row_list:
-            attribute_columns = row[1]
-            start = attribute_columns.get('start')
-            seq = attribute_columns.get('seq')
-            print seq
-            result_list.append(seq)
-    return result_list
+    for row in row_list:
+        attribute_columns = row[1]
+        seq = attribute_columns.get('seq')
+        result_list.append(seq)
+    start_point = s_index_no*3000
+    return "".join(result_list)[start-start_point:end-start_point].upper()
 
 
 if __name__ == '__main__':
@@ -184,6 +181,6 @@ if __name__ == '__main__':
     chr = 13
     start = 19254500
     end = 19255700
-    # reads_list = query_reads(sample_no, chr, start, end)
-    # print reads_list
-    query_ref(chr, start, end)
+    reads_list = query_reads(sample_no, chr, start, end)
+    ref_seq = query_ref(chr, start, end)
+    json.loads({"ref":{"rname":chr,"seq":ref_seq},"reads":reads_list})
