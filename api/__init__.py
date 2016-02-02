@@ -5,10 +5,10 @@ from flask import Flask, request
 
 app = Flask(__name__)
 
+from api.api_pgb import pgb_api
+app.register_blueprint(pgb_api, url_prefix='/api')
+
 @app.route('/hello/', methods=["GET"])
 def hello():
     return "HELLO"
-
-if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=3534)
 
