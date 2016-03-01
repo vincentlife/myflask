@@ -275,11 +275,12 @@ def sam2table2():
             print str(e)
 
 if __name__ == "__main__":
-    chr_no_swich = {
-        "X":'23',
-        "Y":'24',
-        "MT":'25',
-        "*": '26'
-    }
-    rname = 3
-    print chr_no_swich.get(rname, str(rname).zfill(2))
+    # chr_no_swich = {
+    #     "X":'23',
+    #     "Y":'24',
+    #     "MT":'25',
+    #     "*": '26'
+    # }
+    # rname = 3
+    # print chr_no_swich.get(rname, str(rname).zfill(2))
+    sam2table2()

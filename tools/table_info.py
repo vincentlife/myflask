@@ -159,6 +159,6 @@ def BatchWriteRow111():
 
 
 if __name__ == "__main__":
-    pass
+    DescribeTable(TABLE_NAME)
     
 

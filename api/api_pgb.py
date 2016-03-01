@@ -168,6 +168,7 @@ if __name__ == '__main__':
     start = 19254500
     end = 19255700
     reads_list = query_reads(sample_no, chr, start, end)
-    ref_seq = query_ref(chr, start, end)
+    ref_seq = query_ref(1, start, end)
     print reads_list
     print ref_seq
+    print query_reads(3908, 1, 100219, 100520)
