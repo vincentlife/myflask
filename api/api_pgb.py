@@ -67,7 +67,7 @@ def GetBinReads(sample_no_chr, bin_no):
     while next_start_primary_key:
         consumed, next_start_primary_key, row_list = ots_client.get_range(
                 TABLE_NAME, 'FORWARD',
-                inclusive_start_primary_key, exclusive_end_primary_key,
+                next_start_primary_key, exclusive_end_primary_key,
                 columns_to_get, 1000
          )
         result_list.extend(row_list)
@@ -98,6 +98,7 @@ def query_reads(sample_no, chr, start, end):
             mate = attribute_columns.get('seq')
             cigar = attribute_columns.get('cigar')
             strand = attribute_columns.get('strand')
+            print rstart,rend
             if int(rstart) <= int(end) and int(rend) >= int(start):
                 reads_list.append([qname, mate, cigar, strand, rstart, rend])
 
@@ -163,12 +164,11 @@ def get_pgb():
     return json.dumps({"ref":{"rname":chr,"seq":ref_seq},"reads":reads_list})
 
 if __name__ == '__main__':
-    sample_no = 7
-    chr = 13
-    start = 19254500
-    end = 19255700
+    sample_no = 3908
+    chr = 1
+    start = 66040
+    end = 66300
     reads_list = query_reads(sample_no, chr, start, end)
     ref_seq = query_ref(1, start, end)
     print reads_list
     print ref_seq
-    print query_reads(3908, 1, 100219, 100520)

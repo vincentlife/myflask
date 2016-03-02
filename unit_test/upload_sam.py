@@ -67,7 +67,7 @@ def insert2table(TableName, item_list,ots_client):
         batch_write_response = ots_client.batch_write_row(batch_list)
         # print batch_write_response
 # [start_line,end_line)
-def upload_thread(file_path,start_line,end_line,sample_no):
+def upload_thread(file_path,start_line,end_line,sample_no,id):
     ots_client = OTSClient(OTS_ENDPOINT, ACCESSID, ACCESSKEY, INSTANCENAME)
     with open(file_path) as file:
         c = 0
@@ -107,6 +107,7 @@ def upload_thread(file_path,start_line,end_line,sample_no):
                 i += 1
             if i > 169:
                 insert2table(TABLE_NAME, item_list,ots_client)
+                print id
                 pk_set.clear()
                 item_list = []
                 i = 0
@@ -124,10 +125,11 @@ def sam2table(filepath,sample_no):
     start_line = 0
     end_line = start_line + step
     for i in range(10):
+        print i
         if i == 9:
-            threading.Thread(target=upload_thread,args=[filepath,start_line,l,sample_no]).start()
+            threading.Thread(target=upload_thread,args=[filepath,start_line,l,sample_no,i]).start()
         else:
-            threading.Thread(target=upload_thread,args=[filepath,start_line,end_line,sample_no]).start()
+            threading.Thread(target=upload_thread,args=[filepath,start_line,end_line,sample_no,i]).start()
             start_line = end_line
             end_line = start_line + step
 
