@@ -4,6 +4,7 @@
 __author__ = 'wubo'
 import multiprocessing,datetime
 from ots2 import *
+# 内网数据
 OTS_ENDPOINT = "http://samplechr.cn-beijing.ots-internal.aliyuncs.com/"
 # OTS_ENDPOINT = "http://samplechr.cn-beijing.ots.aliyuncs.com/"
 OSS_ENDPOINT = "oss-cn-shenzhen-internal.aliyuncs.com"
@@ -12,6 +13,8 @@ ACCESSKEY = "IuAdh4qL9noDf0UnMOO977HSgZSc0E"
 INSTANCENAME = "samplechr"
 TABLE_NAME = "sample_chr_info"
 
+
+# 特殊染色体对应数字
 chr_no_swich = {
     "X":'23',
     "Y":'24',
@@ -19,6 +22,7 @@ chr_no_swich = {
     "*": '26'
 }
 
+# 上传数据的进程
 def upload_proc(file_path,start_line,end_line,sample_no,id):
     ots_client = OTSClient(OTS_ENDPOINT, ACCESSID, ACCESSKEY, INSTANCENAME)
     print "process %d start" % id
@@ -28,6 +32,7 @@ def upload_proc(file_path,start_line,end_line,sample_no,id):
         pk_set = set()
         item_list = []
         for line in file:
+            # 定位到开始位置
             if c < start_line:
                 c += 1
                 continue
@@ -36,24 +41,31 @@ def upload_proc(file_path,start_line,end_line,sample_no,id):
                 break
             line_list = line.split('\t')
             row_no = i
+            # read对应的bin_no
             bin_no = line_list[0]
+            # read名称
             qname = line_list[1]
+            # 参考染色体号 1~22 X Y M
             rname = line_list[2]
+            # 标识位
             flag = line_list[3]
+            # strand 0 负链 1 正链
             strand = line_list[4]
+            # cigar 主要数据
             cigar = line_list[5]
+            # read 起始位置
             start = line_list[6]
             end = line_list[7]
-            seq = line_list[8]
             chr = chr_no_swich.get(rname, str(rname).zfill(2))
             sample_no_chr = int(str(sample_no)+chr)
+            # ignore 为忽视主键是否存在 EXPECT时重复则抛出条件错误ConditionError
             # condition = Condition('EXPECT_NOT_EXIST')
             condition = Condition('IGNORE')
             primary_key = {u"sample_no_chr": sample_no_chr, u"bin_no": int(bin_no), u'qname': qname, u'flag': flag}
             if (sample_no_chr,int(bin_no),qname,flag) not in pk_set:
                 pk_set.add((sample_no_chr,int(bin_no),qname,flag))
                 attribute_columns = {'rname': rname,'start': start, 'cigar':cigar,
-                                 'end': end, 'seq': seq, 'row_no':row_no,'strand': strand,
+                                 'end': end, 'row_no':row_no,'strand': strand,
                                  'attribute_qname':qname,'attribute_flag':flag}
                 put_row_item = PutRowItem(condition, primary_key, attribute_columns)
                 item_list.append(put_row_item)
@@ -71,12 +83,13 @@ def upload_proc(file_path,start_line,end_line,sample_no,id):
 
 
 def sam2ts(filepath,sample_no):
-    # l = 0
-    # with open(filepath) as file:
-    #     for line in file:
-    #         l += 1
-
-    l = 98818961
+    # 统计文件行数
+    l = 0
+    with open(filepath) as file:
+        for line in file:
+            l += 1
+    # l = 98818961
+    # 等分为20
     step = l/20
     start_line = 0
     end_line = start_line + step

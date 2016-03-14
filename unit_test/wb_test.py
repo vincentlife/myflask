@@ -34,6 +34,8 @@ def get_cigar(cigar, seq):
     cigar_list = re.findall(r'\d+\w', cigar)
     new_cigar_list = []
     seq_p = 0
+    if len(cigar_list) == 0:
+        return "*"
     for item in cigar_list:
         name = item[-1].upper()
         if name == 'S' or name == 'I':
@@ -73,7 +75,7 @@ def handle_sam(filepath, handle_file):
             chr = line_list[2]
             start = line_list[3]
             mate = line_list[9]
-            md = line_list[12]
+            # md = line_list[12]
             #print (line_list[1],bin(line_list[1])
             flag = str(bin(int(line_list[1])))
             strand = int(flag[-5]) + int(flag[-6])
@@ -81,6 +83,8 @@ def handle_sam(filepath, handle_file):
             end = get_length(cigar) + int(start) - 1
             bin_no = intial_bin(int(start), end)
             cigar_str = get_cigar(cigar, mate)
+            if cigar_str == "*":
+                continue
             # print cigar,cigar_str
             tmp_list=[str(bin_no), qname, chr, line_list[1], str(strand), cigar_str, start, str(end)]
             fwp.write('\t'.join(tmp_list)+'\n')

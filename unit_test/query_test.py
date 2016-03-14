@@ -1,13 +1,7 @@
 # -*- coding: utf-8 -*-
-# Create Date 2016/1/30 0030
+# !/usr/bin/python
+# Create Date 2016/3/3 0003
 __author__ = 'wubo'
-
-from ots2 import *
-from operator import itemgetter
-import json
-from api import app
-from flask import request,Blueprint
-
 ENDPOINT = "http://samplechr.cn-beijing.ots.aliyuncs.com/"
 ACCESSID = "QFmrMPB18qNx9KYc"
 ACCESSKEY = "IuAdh4qL9noDf0UnMOO977HSgZSc0E"
@@ -15,14 +9,15 @@ INSTANCENAME = "samplechr"
 TABLE_NAME = "sample_chr_info"
 REF_TABLE = "ref_seq"
 
-ots_client = OTSClient(ENDPOINT, ACCESSID, ACCESSKEY, INSTANCENAME)
+from ots2 import *
+from operator import itemgetter
+import time,threading
 
 binOffsets = [512+64+8+1, 64+8+1, 8+1, 1, 0]
 binFirstShift = 17
 binNextShift = 3
 
-pgb_api = Blueprint("pgb_api",__name__)
-
+ots_client = OTSClient(ENDPOINT, ACCESSID, ACCESSKEY, INSTANCENAME)
 
 def init_bin(start, end):
     '''
@@ -52,6 +47,8 @@ def GetBinReads(sample_no_chr, bin_no):
     :param bin_no:
     :return:
     '''
+    print bin_no
+    s = time.time()
     # 查询区间：[(1, INF_MIN), (4, INF_MAX))，左闭右开。
     #print sample_no_chr
     result_list = []
@@ -61,16 +58,25 @@ def GetBinReads(sample_no_chr, bin_no):
     consumed, next_start_primary_key, row_list = ots_client.get_range(
                 TABLE_NAME, 'FORWARD',
                 inclusive_start_primary_key, exclusive_end_primary_key,
-                columns_to_get, 1000
+                columns_to_get
     )
+    i = 1
+    t = time.time()-s
+    print len(row_list)
+    # print "query %d %d" % (i,t)
     result_list.extend(row_list)
     while next_start_primary_key:
         consumed, next_start_primary_key, row_list = ots_client.get_range(
                 TABLE_NAME, 'FORWARD',
                 next_start_primary_key, exclusive_end_primary_key,
-                columns_to_get, 1000
+                columns_to_get
          )
+        i += 1
+        t = time.time()-t
+        # print "query %d %d" % (i,t)
+        print len(row_list)
         result_list.extend(row_list)
+    print "bin %d result %d" % (bin_no,len(result_list))
     return result_list
 
 
@@ -85,12 +91,15 @@ def read2dic(item):
 
 
 def query_reads(sample_no, chr, start, end):
+    ss = time.time()
     bin_list = init_bin(start, end)
     reads_list = []
     sample_no_chr =str(sample_no) + str(chr).zfill(2)
     # 获取range包含的所有bin中的reads
     for bin_no in bin_list:
         row_list = GetBinReads(sample_no_chr, bin_no)
+        ss = time.time()-ss
+        # print "row time %d " % ss
         for row in row_list:
             attribute_columns = row[1]
             rstart = int(attribute_columns.get('start'))
@@ -99,10 +108,8 @@ def query_reads(sample_no, chr, start, end):
             # mate = attribute_columns.get('seq')
             cigar = attribute_columns.get('cigar')
             strand = attribute_columns.get('strand')
-            print rstart,rend
             if int(rstart) <= int(end) and int(rend) >= int(start):
                 reads_list.append([qname, cigar, strand, rstart, rend])
-
     # 对reads_list 进行排序并得出level
     sort_reads = sorted(reads_list, key=itemgetter(3, 4))#start,end整形
     level_list = []
@@ -154,23 +161,18 @@ def query_ref(chr, start, end):
     return "".join(result_list)[start-start_point:end-start_point].upper()
 
 
-@pgb_api.route("/pgb/", methods=['GET'])
-def get_pgb():
-    req = json.loads(request.data)
-    start,end = req['range']
-    sample_no = req["sample_no"]
-    chr = req["chr"]
-    reads_list = query_reads(sample_no, chr, start, end)
-    ref_seq = query_ref(chr, start, end)
-    return json.dumps({"ref":{"rname":chr,"seq":ref_seq},"reads":reads_list})
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     sample_no = 3908
     chr = 3
-    start = 58720151
-    end = 58720300
-    # reads_list = query_reads(sample_no, chr, start, end)
-    # ref_seq = query_ref(1, start, end)
-    # print reads_list
-    # print ref_seq
-    print time.time()
+    s = 52428710
+    e = 52428750
+    st = time.time()
+    query_reads(sample_no,chr,s,e)
+    # t = threading.Thread(target=query_reads, args=[sample_no,chr,s,e])
+    # t.setDaemon(True)
+    # t.start()
+    print query_ref(chr,s,e)
+    # t.join()
+    print "--------total time------------"
+    print time.time()-st
+
