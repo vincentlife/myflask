@@ -2,7 +2,8 @@
 # !/usr/bin/python
 # Create Date 2016/3/14 0014
 __author__ = 'wubo'
-
+import time
+from urllib3.poolmanager import PoolManager
 _NETWORK_IO_TIME_COUNT_FLAG = False
 _network_io_time = 0
 

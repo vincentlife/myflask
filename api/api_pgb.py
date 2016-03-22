@@ -1,21 +1,26 @@
+#! /usr/bin/env python
 # -*- coding: utf-8 -*-
 # Create Date 2016/1/30 0030
 __author__ = 'wubo'
 
 from ots2 import *
 from operator import itemgetter
-import json
-from api import app
-from flask import request,Blueprint
+import json,requests
+from flask import request, Blueprint
+import time
 
-ENDPOINT = "http://samplechr.cn-beijing.ots.aliyuncs.com/"
+OTS_ENDPOINT = "http://samplechr.cn-beijing.ots-internal.aliyuncs.com/"
+OTS_ENDPOINT = "http://samplechr.cn-beijing.ots.aliyuncs.com/"
+OSS_ENDPOINT = "oss-cn-shenzhen-internal.aliyuncs.com"
 ACCESSID = "QFmrMPB18qNx9KYc"
 ACCESSKEY = "IuAdh4qL9noDf0UnMOO977HSgZSc0E"
 INSTANCENAME = "samplechr"
-TABLE_NAME = "sample_chr_info"
+TABLE_NAME = "sample_pgb"
 REF_TABLE = "ref_seq"
 
-ots_client = OTSClient(ENDPOINT, ACCESSID, ACCESSKEY, INSTANCENAME)
+
+ots_client = OTSClient(OTS_ENDPOINT, ACCESSID, ACCESSKEY, INSTANCENAME)
+
 
 binOffsets = [512+64+8+1, 64+8+1, 8+1, 1, 0]
 binFirstShift = 17
@@ -36,8 +41,14 @@ def init_bin(start, end):
     startBin >>= binFirstShift
     endBin >>= binFirstShift
     bin_list = []
+    k = 2
     for i in range(len(binOffsets)):
         bin_list.extend([binOffsets[i] + startBin, binOffsets[i] + endBin])
+        # if k < len(binOffsets) - 1:
+        #     for item in range(startBin, endBin+1):
+        #         if item%8 == 0 or (item+1)%8 == 0:
+        #             k += 1
+        #             break
         startBin >>= binNextShift
         endBin >>= binNextShift
     bin_set = set(bin_list)
@@ -55,20 +66,21 @@ def GetBinReads(sample_no_chr, bin_no):
     # 查询区间：[(1, INF_MIN), (4, INF_MAX))，左闭右开。
     #print sample_no_chr
     result_list = []
-    inclusive_start_primary_key = {'sample_no_chr': int(sample_no_chr), 'bin_no': bin_no, 'qname': INF_MIN, 'flag': INF_MIN}
-    exclusive_end_primary_key = {'sample_no_chr': int(sample_no_chr), 'bin_no': bin_no, 'qname': INF_MAX, 'flag': INF_MAX}
-    columns_to_get = ['bin_no', 'attribute_qname', 'start', 'end', 'cigar', 'seq', 'row_no','strand','attribute_flag']
+
+    inclusive_start_primary_key = {'s_chr': sample_no_chr, 'bin_no': bin_no, 'sys_no': INF_MIN}
+    exclusive_end_primary_key = {'s_chr': sample_no_chr, 'bin_no': bin_no, 'sys_no': INF_MAX}
+    columns_to_get = ['start', 'end', 'cigar', 'strand']
     consumed, next_start_primary_key, row_list = ots_client.get_range(
                 TABLE_NAME, 'FORWARD',
                 inclusive_start_primary_key, exclusive_end_primary_key,
-                columns_to_get, 1000
+                columns_to_get
     )
     result_list.extend(row_list)
     while next_start_primary_key:
         consumed, next_start_primary_key, row_list = ots_client.get_range(
                 TABLE_NAME, 'FORWARD',
                 next_start_primary_key, exclusive_end_primary_key,
-                columns_to_get, 1000
+                columns_to_get
          )
         result_list.extend(row_list)
     return result_list
@@ -85,26 +97,44 @@ def read2dic(item):
 
 
 def query_reads(sample_no, chr, start, end):
+    s = time.time()
     bin_list = init_bin(start, end)
+    print len(bin_list)
     reads_list = []
     sample_no_chr =str(sample_no) + str(chr).zfill(2)
     # 获取range包含的所有bin中的reads
     for bin_no in bin_list:
-        row_list = GetBinReads(sample_no_chr, bin_no)
+        row_list = GetBinReads(sample_no_chr, str(bin_no))
+        t = time.time()
+        print t -s
+        s = t
+        i = 0
         for row in row_list:
             attribute_columns = row[1]
-            rstart = int(attribute_columns.get('start'))
-            rend = int(attribute_columns.get('end'))
-            qname = attribute_columns.get('attribute_qname')
-            # mate = attribute_columns.get('seq')
-            cigar = attribute_columns.get('cigar')
-            strand = attribute_columns.get('strand')
-            print rstart,rend
-            if int(rstart) <= int(end) and int(rend) >= int(start):
-                reads_list.append([qname, cigar, strand, rstart, rend])
+            # l0 = attribute_columns.get('start').split("\r\t\n")
+            # l1 = attribute_columns.get('end').split("\r\t\n")
+            # l2 = attribute_columns.get('cigar').split("\r\t\n")
+            # l3 = attribute_columns.get('strand').split("\r\t\n")
+            l0 = attribute_columns.get('start').split("|")
+            l1 = attribute_columns.get('end').split("|")
+            l2 = attribute_columns.get('cigar').split("|")
+            l3 = attribute_columns.get('strand').split("|")
+            for j in range(len(l0)):
+                i += 1
+                qname = str(bin_no)+str(i)
+                attribute_columns = row[1]
+                rstart = int(l0[j])
+                rend = int(l1[j])
+                cigar = l2[j]
+                strand = l3[j]
+                if rstart <= int(end) and rend >= int(start):
+                    reads_list.append([qname, cigar, strand, rstart, rend])
+
 
     # 对reads_list 进行排序并得出level
-    sort_reads = sorted(reads_list, key=itemgetter(3, 4))#start,end整形
+    if len(reads_list) == 0:
+        return reads_list
+    sort_reads = sorted(reads_list, key=itemgetter(3, 4)) # start,end整型
     level_list = []
     level_list.append([sort_reads[0]])
     length = len(sort_reads)
@@ -123,6 +153,8 @@ def query_reads(sample_no, chr, start, end):
         for item in level:
             lev_list.append(read2dic(item))
         result_list.append(lev_list)
+    print "handle time"
+    print time.time()- s
     return result_list
 
 
@@ -154,23 +186,12 @@ def query_ref(chr, start, end):
     return "".join(result_list)[start-start_point:end-start_point].upper()
 
 
-@pgb_api.route("/pgb/", methods=['GET'])
-def get_pgb():
-    req = json.loads(request.data)
-    start,end = req['range']
-    sample_no = req["sample_no"]
-    chr = req["chr"]
-    reads_list = query_reads(sample_no, chr, start, end)
-    ref_seq = query_ref(chr, start, end)
-    return json.dumps({"ref":{"rname":chr,"seq":ref_seq},"reads":reads_list})
 
 if __name__ == '__main__':
-    sample_no = 3908
-    chr = 3
-    start = 58720151
-    end = 58720300
-    # reads_list = query_reads(sample_no, chr, start, end)
-    # ref_seq = query_ref(1, start, end)
-    # print reads_list
-    # print ref_seq
-    print time.time()
+    sample_no = 3918
+    chr = 1
+    start = 69500
+    end = 69600
+    s = time.time()
+    # query_reads(sample_no, 1, start, end)
+    print query_ref(chr,69500,69600)

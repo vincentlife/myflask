@@ -9,20 +9,13 @@ import urlparse
 import calendar
 import logging
 
-import google.protobuf.text_format as text_format
-
-from ots2.error import *
-from ots2.protobuf.encoder import OTSProtoBufferEncoder
-from ots2.protobuf.decoder import OTSProtoBufferDecoder
-import ots2.protobuf.ots_protocol_2_pb2 as pb2
+from jy_ots.error import *
 
 
 class OTSProtocol:
 
     api_version = '2014-08-08'
 
-    encoder_class = OTSProtoBufferEncoder
-    decoder_class = OTSProtoBufferDecoder
 
     api_list = {
         'CreateTable',
@@ -43,8 +36,6 @@ class OTSProtocol:
         self.user_id = user_id
         self.user_key = user_key
         self.instance_name = instance_name
-        self.encoder = self.encoder_class(encoding)
-        self.decoder = self.decoder_class(encoding)
         self.logger = logger
 
     def _make_headers_string(self, headers):
@@ -197,32 +188,6 @@ class OTSProtocol:
             request_id = ""
         return request_id
 
-    def parse_response(self, api_name, status, headers, body):
-        if api_name not in self.api_list:
-            raise OTSClientError("API %s is not supported." % api_name)
-
-        headers = self._convert_urllib3_headers(headers)
-
-        try:
-            start_time = time.time()
-            ret, proto = self.decoder.decode_response(api_name, body)
-            decode_time = time.time() - start_time
-        except Exception, e:
-            request_id = self._get_request_id_string(headers)
-            error_message = 'Response format is invalid, %s, RequestID: %s, " \
-                "HTTP status: %s, Body: %s.' % (str(e), request_id, status, body)
-            self.logger.error(error_message)
-            raise OTSClientError(error_message, status)
-
-        if self.logger.level <= logging.DEBUG:
-            # prevent to generate formatted message which is time consuming 
-            request_id = self._get_request_id_string(headers)
-            self.logger.debug("OTS response, API: %s, RequestID: %s, Protobuf: %s." % (
-                api_name, request_id, 
-                text_format.MessageToString(proto, as_utf8=True, as_one_line=True)
-            ))
-        return ret, decode_time
-
     def handle_error(self, api_name, query, status, reason, headers, body):
         # convert headers according to different urllib3 versions.
         std_headers = self._convert_urllib3_headers(headers)
@@ -249,27 +214,27 @@ class OTSProtocol:
             return
         else:
             request_id = self._get_request_id_string(std_headers)
-
-            try:
-                error_proto = pb2.Error()
-                error_proto.ParseFromString(body)
-                error_code = error_proto.code
-                error_message = error_proto.message
-            except:
-                error_message = "HTTP status: %s, reason: %s." % (status, reason)
-                self.logger.error(error_message)
-                raise OTSClientError(error_message, status)
-
-            try:
-                if status == 403 and error_proto.code != "OTSAuthFailed":
-                    self._check_authorization(query, std_headers)
-            except OTSClientError, e:
-                e.http_status = status
-                e.message += " HTTP status: %s." % status
-                raise e
-
-            self.logger.error("OTS request failed, API: %s, HTTPStatus: %s, " \
-                "ErrorCode: %s, ErrorMessage: %s, RequestID: %s." % (
-                api_name, status, error_proto.code, error_proto.message, request_id)
-            )
-            raise OTSServiceError(status, error_proto.code, error_proto.message, request_id)
+            raise OTSServiceError(status, status, body, request_id)
+            # try:
+            #     error_proto = pb2.Error()
+            #     error_proto.ParseFromString(body)
+            #     error_code = error_proto.code
+            #     error_message = error_proto.message
+            # except:
+            #     error_message = "HTTP status: %s, reason: %s." % (status, reason)
+            #     self.logger.error(error_message)
+            #     raise OTSClientError(error_message, status)
+            #
+            # try:
+            #     if status == 403 and error_proto.code != "OTSAuthFailed":
+            #         self._check_authorization(query, std_headers)
+            # except OTSClientError, e:
+            #     e.http_status = status
+            #     e.message += " HTTP status: %s." % status
+            #     raise e
+            #
+            # self.logger.error("OTS request failed, API: %s, HTTPStatus: %s, " \
+            #     "ErrorCode: %s, ErrorMessage: %s, RequestID: %s." % (
+            #     api_name, status, error_proto.code, error_proto.message, request_id)
+            # )
+            # raise OTSServiceError(status, error_proto.code, error_proto.message, request_id)
