@@ -5,7 +5,7 @@ import time
 import logging
 import unittest
 
-from ots2 import *
+from t_ots2 import *
 
 ENDPOINT = 'your_instance_address'
 ACCESSID = 'your_accessid'

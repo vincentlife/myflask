@@ -126,7 +126,7 @@ def query_reads(sample_no, chr, start, end):
                 rstart = int(l0[j])
                 rend = int(l1[j])
                 cigar = l2[j]
-                strand = l3[j]
+                strand = int(l3[j])
                 if rstart <= int(end) and rend >= int(start):
                     reads_list.append([qname, cigar, strand, rstart, rend])
 
@@ -193,5 +193,5 @@ if __name__ == '__main__':
     start = 69500
     end = 69600
     s = time.time()
-    # query_reads(sample_no, 1, start, end)
+    print query_reads(sample_no, 1, start, end)
     print query_ref(chr,69500,69600)

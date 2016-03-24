@@ -5,10 +5,10 @@ import logging
 import unittest
 import exceptions
 
-from ots2.client import *
-from ots2.metadata import *
-from ots2.error import *
-from ots2.test.mock_connection import MockConnection
+from t_ots2.client import *
+from t_ots2.metadata import *
+from t_ots2.error import *
+from t_ots2.test.mock_connection import MockConnection
 
 ENDPOINT = 'http://10.97.204.97:8800'
 ACCESSID = 'accessid'

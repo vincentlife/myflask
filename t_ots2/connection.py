@@ -6,7 +6,7 @@ import time
 from urllib3.poolmanager import PoolManager
 from urllib3.connectionpool import HTTPConnectionPool
 
-from ots2.error import *
+from t_ots2.error import *
 
 _NETWORK_IO_TIME_COUNT_FLAG = False
 _network_io_time = 0
@@ -36,6 +36,7 @@ class ConnectionPool:
 
         if _NETWORK_IO_TIME_COUNT_FLAG:
             begin = time.time()
+
         response = self.pool.urlopen(
             'POST', self.host + self.path + url, 
             body=request_body, headers=request_headers,
@@ -50,4 +51,5 @@ class ConnectionPool:
         # TODO error handling
         response_headers = dict(response.getheaders())
         response_body = response.data # TODO figure out why response.read() don't work
+
         return response.status, response.reason, response_headers, response_body

@@ -1,6 +1,6 @@
 # -*- coding: utf8 -*-
 
-from ots2.error import *
+from t_ots2.error import *
 
 __all__ = [
     'INF_MIN',

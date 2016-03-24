@@ -6,10 +6,10 @@ ENDPOINT = "http://samplechr.cn-beijing.ots.aliyuncs.com/"
 ACCESSID = "QFmrMPB18qNx9KYc"
 ACCESSKEY = "IuAdh4qL9noDf0UnMOO977HSgZSc0E"
 INSTANCENAME = "samplechr"
-TABLE_NAME = "sample_chr_info"
+TABLE_NAME = "sample_pgb"
 REF_TABLE = "ref_seq"
 
-from ots2 import *
+from t_ots2 import *
 from operator import itemgetter
 import time,threading
 
@@ -48,35 +48,28 @@ def GetBinReads(sample_no_chr, bin_no):
     :return:
     '''
     print bin_no
-    s = time.time()
     # 查询区间：[(1, INF_MIN), (4, INF_MAX))，左闭右开。
     #print sample_no_chr
     result_list = []
-    inclusive_start_primary_key = {'sample_no_chr': int(sample_no_chr), 'bin_no': bin_no, 'qname': INF_MIN, 'flag': INF_MIN}
-    exclusive_end_primary_key = {'sample_no_chr': int(sample_no_chr), 'bin_no': bin_no, 'qname': INF_MAX, 'flag': INF_MAX}
-    columns_to_get = ['bin_no', 'attribute_qname', 'start', 'end', 'cigar', 'seq', 'row_no','strand','attribute_flag']
-    consumed, next_start_primary_key, row_list = ots_client.get_range(
+    inclusive_start_primary_key = {'s_chr': sample_no_chr, 'bin_no': bin_no, 'sys_no': INF_MIN}
+    exclusive_end_primary_key = {'s_chr': sample_no_chr, 'bin_no': bin_no, 'sys_no': INF_MAX}
+    columns_to_get = [ 'start', 'end', 'cigar', 'strand']
+    consumed, next_start_primary_key, row_list,t1,t2 = ots_client.get_range(
                 TABLE_NAME, 'FORWARD',
                 inclusive_start_primary_key, exclusive_end_primary_key,
                 columns_to_get
     )
-    i = 1
-    t = time.time()-s
-    print len(row_list)
-    # print "query %d %d" % (i,t)
+    print t1,t2
     result_list.extend(row_list)
     while next_start_primary_key:
-        consumed, next_start_primary_key, row_list = ots_client.get_range(
+        consumed, next_start_primary_key, row_list, t1, t2 = ots_client.get_range(
                 TABLE_NAME, 'FORWARD',
                 next_start_primary_key, exclusive_end_primary_key,
                 columns_to_get
          )
-        i += 1
-        t = time.time()-t
-        # print "query %d %d" % (i,t)
-        print len(row_list)
+        print t1,t2
         result_list.extend(row_list)
-    print "bin %d result %d" % (bin_no,len(result_list))
+    print "---------------------------------------------"
     return result_list
 
 
@@ -91,27 +84,35 @@ def read2dic(item):
 
 
 def query_reads(sample_no, chr, start, end):
-    ss = time.time()
     bin_list = init_bin(start, end)
     reads_list = []
     sample_no_chr =str(sample_no) + str(chr).zfill(2)
     # 获取range包含的所有bin中的reads
     for bin_no in bin_list:
-        row_list = GetBinReads(sample_no_chr, bin_no)
-        ss = time.time()-ss
-        # print "row time %d " % ss
+        row_list = GetBinReads(sample_no_chr, str(bin_no))
+        break
+        i = 0
         for row in row_list:
             attribute_columns = row[1]
-            rstart = int(attribute_columns.get('start'))
-            rend = int(attribute_columns.get('end'))
-            qname = attribute_columns.get('attribute_qname')
-            # mate = attribute_columns.get('seq')
-            cigar = attribute_columns.get('cigar')
-            strand = attribute_columns.get('strand')
-            if int(rstart) <= int(end) and int(rend) >= int(start):
-                reads_list.append([qname, cigar, strand, rstart, rend])
+            l0 = attribute_columns.get('start').split("|")
+            l1 = attribute_columns.get('end').split("|")
+            l2 = attribute_columns.get('cigar').split("|")
+            l3 = attribute_columns.get('strand').split("|")
+            for j in range(len(l0)):
+                i += 1
+                qname = str(bin_no)+str(i)
+                rstart = int(l0[j])
+                rend = int(l1[j])
+                cigar = l2[j]
+                strand = int(l3[j])
+                if rstart <= int(end) and rend >= int(start):
+                    reads_list.append([qname, cigar, strand, rstart, rend])
+
+
     # 对reads_list 进行排序并得出level
-    sort_reads = sorted(reads_list, key=itemgetter(3, 4))#start,end整形
+    if len(reads_list) == 0:
+        return reads_list
+    sort_reads = sorted(reads_list, key=itemgetter(3, 4)) # start,end整型
     level_list = []
     level_list.append([sort_reads[0]])
     length = len(sort_reads)
@@ -132,7 +133,6 @@ def query_reads(sample_no, chr, start, end):
         result_list.append(lev_list)
     return result_list
 
-
 def query_ref(chr, start, end):
     '''
     根据范围返回参考序列
@@ -147,32 +147,26 @@ def query_ref(chr, start, end):
     inclusive_start_primary_key = {'chr_no': str(chr), 'index_no': str(s_index_no)}
     exclusive_end_primary_key = {'chr_no': str(chr), 'index_no': str(e_index_no+1)}
     columns_to_get = ['seq']
-    consumed, next_start_primary_key, row_list = ots_client.get_range(
+    consumed, next_start_primary_key, row_list,t1,t2 = ots_client.get_range(
             REF_TABLE, 'FORWARD',
             inclusive_start_primary_key, exclusive_end_primary_key,
             columns_to_get
     )
-    result_list = []
-    for row in row_list:
-        attribute_columns = row[1]
-        seq = attribute_columns.get('seq')
-        result_list.append(seq)
-    start_point = s_index_no*3000
-    return "".join(result_list)[start-start_point:end-start_point].upper()
+    print type(t2)
+    print t1, t2
+    # result_list = []
+    # for row in row_list:
+    #     attribute_columns = row[1]
+    #     seq = attribute_columns.get('seq')
+    #     result_list.append(seq)
+    # start_point = s_index_no*3000
+    # return "".join(result_list)[start-start_point:end-start_point].upper()
 
 
 if __name__ == "__main__":
-    sample_no = 3908
-    chr = 3
-    s = 52428710
-    e = 52428750
-    st = time.time()
-    query_reads(sample_no,chr,s,e)
-    # t = threading.Thread(target=query_reads, args=[sample_no,chr,s,e])
-    # t.setDaemon(True)
-    # t.start()
-    print query_ref(chr,s,e)
-    # t.join()
-    print "--------total time------------"
-    print time.time()-st
-
+    sample_no = 3911
+    chr =1
+    s = 104700
+    e = 104800
+    # query_reads(sample_no,chr,s,e)
+    query_ref(chr,s,e)

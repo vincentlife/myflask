@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Create Date 2016/1/30 0030
 __author__ = 'wubo'
-from ots2 import *
+from z_ots2 import *
 import re
 
 ENDPOINT = "http://samplechr.cn-beijing.ots.aliyuncs.com/"

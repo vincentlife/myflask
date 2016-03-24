@@ -11,10 +11,10 @@ import logging
 
 import google.protobuf.text_format as text_format
 
-from ots2.error import *
-from ots2.protobuf.encoder import OTSProtoBufferEncoder
-from ots2.protobuf.decoder import OTSProtoBufferDecoder
-import ots2.protobuf.ots_protocol_2_pb2 as pb2
+from t_ots2.error import *
+from t_ots2.protobuf.encoder import OTSProtoBufferEncoder
+from t_ots2.protobuf.decoder import OTSProtoBufferDecoder
+import t_ots2.protobuf.ots_protocol_2_pb2 as pb2
 
 
 class OTSProtocol:
@@ -172,24 +172,25 @@ class OTSProtocol:
         if signature != self._make_response_signature(query, headers):
             raise OTSClientError('Invalid signature in response.')
 
-    def make_request(self, api_name, body):
+    def make_request(self, api_name, *args, **kwargs):
         
         if api_name not in self.api_list:
             raise OTSClientError('API %s is not supported.' % api_name)
 
-        # proto = self.encoder.encode_request(batch_list)
-        # body = proto.SerializeToString()
+        proto = self.encoder.encode_request(api_name, *args, **kwargs)
+        body = proto.SerializeToString()
+            
         query = '/' + api_name
         headers = self._make_headers(body, query)
 
-        # if self.logger.level <= logging.DEBUG:
-        #     # prevent to generate formatted message which is time consuming
-        #     self.logger.debug("OTS request, API: %s, Headers: %s, Protobuf: %s" % (
-        #         api_name, headers,
-        #         text_format.MessageToString(proto, as_utf8=True, as_one_line=True)
-        #     ))
+        if self.logger.level <= logging.DEBUG:
+            # prevent to generate formatted message which is time consuming 
+            self.logger.debug("OTS request, API: %s, Headers: %s, Protobuf: %s" % (
+                api_name, headers, 
+                text_format.MessageToString(proto, as_utf8=True, as_one_line=True)
+            ))
 
-        return query, headers
+        return query, headers, body
 
     def _get_request_id_string(self, headers):
         request_id = headers.get('x-ots-requestid')
@@ -204,9 +205,7 @@ class OTSProtocol:
         headers = self._convert_urllib3_headers(headers)
 
         try:
-            start_time = time.time()
             ret, proto = self.decoder.decode_response(api_name, body)
-            decode_time = time.time() - start_time
         except Exception, e:
             request_id = self._get_request_id_string(headers)
             error_message = 'Response format is invalid, %s, RequestID: %s, " \
@@ -221,7 +220,7 @@ class OTSProtocol:
                 api_name, request_id, 
                 text_format.MessageToString(proto, as_utf8=True, as_one_line=True)
             ))
-        return ret, decode_time
+        return ret
 
     def handle_error(self, api_name, query, status, reason, headers, body):
         # convert headers according to different urllib3 versions.

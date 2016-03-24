@@ -9,7 +9,7 @@ OTS Python SDK提供了通过Python API访问OTS的方式。它实现了连接�
 
 这个SDK的文档包含了对每个接口的详细说明和使用样例。而作为开头，这里有一个建表，插入一行，并读取的例子。
 
-    from ots2 import *
+    from t_ots2 import *
 
     client = OTSClient(
         'http://your_ots_address/',
@@ -84,9 +84,9 @@ __all__ = [
 
 __author__ = 'Haowei YAO <haowei.yao@aliyun-inc.com>; Kunpeng HAN <kunpeng.hkp@aliyun-inc.com>'
 
-from ots2.client import OTSClient
+from t_ots2.client import OTSClient
 
-from ots2.metadata import *
-from ots2.error import *
-from ots2.retry import *
+from t_ots2.metadata import *
+from t_ots2.error import *
+from t_ots2.retry import *
 

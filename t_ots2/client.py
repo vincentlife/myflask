@@ -9,11 +9,11 @@ import logging
 import urlparse
 import time
 
-from ots2.error import *
-from ots2.protocol import OTSProtocol
-from ots2.connection import ConnectionPool
-from ots2.metadata import *
-from ots2.retry import DefaultRetryPolicy
+from t_ots2.error import *
+from t_ots2.protocol import OTSProtocol
+from t_ots2.connection import ConnectionPool
+from t_ots2.metadata import *
+from t_ots2.retry import DefaultRetryPolicy
 
 
 class OTSClient(object):
@@ -29,7 +29,7 @@ class OTSClient(object):
     DEFAULT_ENCODING = 'utf8'
     DEFAULT_SOCKET_TIMEOUT = 50
     DEFAULT_MAX_CONNECTION = 50
-    DEFAULT_LOGGER_NAME = 'ots2-client'
+    DEFAULT_LOGGER_NAME = 't_ots2-client'
 
     protocol_class = OTSProtocol
     connection_pool_class = ConnectionPool 
@@ -59,7 +59,7 @@ class OTSClient(object):
 
         示例：创建一个OTSClient实例
 
-            from ots2.client import OTSClient
+            from t_ots2.client import OTSClient
 
             ots_client = OTSClient('your_instance_endpoint', 'your_user_id', 'your_user_key', 'your_instance_name')
         """
@@ -114,10 +114,14 @@ class OTSClient(object):
             retry_policy = DefaultRetryPolicy()
         self.retry_policy = retry_policy
 
-    def _request_helper(self, api_name, body):
-        query, reqheaders = self.protocol.make_request(api_name, body)
+    def _request_helper(self, api_name, *args, **kwargs):
+
+        query, reqheaders, reqbody = self.protocol.make_request(
+            api_name, *args, **kwargs
+        )
+
         retry_times = 0
-        reqbody = body
+        t = time.time()
         while True:
 
             try:
@@ -135,9 +139,11 @@ class OTSClient(object):
                     retry_times += 1
                 else:
                     raise e
-        ret, decode_time = self.protocol.parse_response(api_name, status, resheaders, resbody)
-
-        return ret, decode_time
+        s = time.time()
+        re_time = s- t
+        ret = self.protocol.parse_response(api_name, status, resheaders, resbody)
+        d_time = time.time()-s
+        return ret,reqheaders,reqbody
 
     def create_table(self, table_meta, reserved_throughput):
         """
@@ -196,7 +202,7 @@ class OTSClient(object):
         说明：更新表属性，目前只支持修改预留读写吞吐量。
         
         ``table_name``是对应的表名。
-        ``reserved_throughput``是``ots2.metadata.ReservedThroughput``类的实例，表示预留读写吞吐量。
+        ``reserved_throughput``是``t_ots2.metadata.ReservedThroughput``类的实例，表示预留读写吞吐量。
 
         返回：针对该表的预留读写吞吐量的最近上调时间、最近下调时间和当天下调次数。
 
@@ -376,7 +382,7 @@ class OTSClient(object):
         response_rows_list = self._request_helper('BatchGetRow', batch_list)
         return response_rows_list
 
-    def batch_write_row(self, body):
+    def batch_write_row(self, batch_list):
         """
         说明：批量修改多行数据。
 
@@ -442,8 +448,9 @@ class OTSClient(object):
             batch_list = [table_item1, table_item2]
             batch_write_response = ots_client.batch_write_row(batch_list) 
         """
-        response_item_list, decode_time = self._request_helper('BatchWriteRow', body)
-        return response_item_list, decode_time
+
+        response_item_list = self._request_helper('BatchWriteRow', batch_list)
+        return response_item_list
 
     def get_range(self, table_name, direction, 
                   inclusive_start_primary_key, 
@@ -476,13 +483,13 @@ class OTSClient(object):
                         columns_to_get, 100
             )
         """
-
-        (consumed, next_start_primary_key, row_list) = self._request_helper(
+        s = time.time()
+        (consumed, next_start_primary_key, row_list),t1,t2 = self._request_helper(
                     'GetRange', table_name, direction, 
                     inclusive_start_primary_key, exclusive_end_primary_key,
                     columns_to_get, limit
         )
-        return consumed, next_start_primary_key, row_list
+        return consumed, next_start_primary_key, row_list,t1,t2
 
     def xget_range(self, table_name, direction,
                    inclusive_start_primary_key,

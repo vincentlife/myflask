@@ -2,7 +2,7 @@
 # !/usr/bin/python
 # Create Date 2016/2/1 0001
 __author__ = 'wubo'
-from ots2 import *
+from z_ots2 import *
 import time
 
 ENDPOINT = "http://samplechr.cn-beijing.ots.aliyuncs.com/"

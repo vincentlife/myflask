@@ -104,7 +104,7 @@ class OTSClient(object):
             retry_policy = DefaultRetryPolicy()
         self.retry_policy = retry_policy
 
-    def batch_write_row(self,body):
+    def batch_write_row(self, body):
         query, reqheaders = self.protocol.make_request('BatchWriteRow', body)
         retry_times = 0
         reqbody = body
@@ -125,49 +125,49 @@ class OTSClient(object):
                 else:
                     raise e
 
-    # def get_range(self, table_name, direction,
-    #               inclusive_start_primary_key,
-    #               exclusive_end_primary_key,
-    #               columns_to_get=None, limit=None):
-    #     api_name = 'GetRange'
-    #     self.protocol_class.encoder.encoder_request()
-    #     proto = self.encoder.encode_request(api_name, *args, **kwargs)
-    #     body = proto.SerializeToString()
-    #
-    #     query = '/' + api_name
-    #     query, reqheaders, reqbody = self.protocol.make_request(
-    #         api_name, *args, **kwargs
-    #     )
-    #
-    #     retry_times = 0
-    #
-    #     while True:
-    #
-    #         try:
-    #             status, reason, resheaders, resbody = self.connection.send_receive(
-    #                 query, reqheaders, reqbody
-    #             )
-    #             self.protocol.handle_error(api_name, query, status, reason, resheaders, resbody)
-    #             break
-    #
-    #         except OTSServiceError as e:
-    #
-    #             if self.retry_policy.should_retry(retry_times, e, api_name):
-    #                 retry_delay = self.retry_policy.get_retry_delay(retry_times, e, api_name)
-    #                 time.sleep(retry_delay)
-    #                 retry_times += 1
-    #             else:
-    #                 raise e
-    #
-    #     ret = self.protocol.parse_response(api_name, status, resheaders, resbody)
-    #
-    #     return ret
-    #     (consumed, next_start_primary_key, row_list) = self._request_helper(
-    #                 'GetRange', table_name, direction,
-    #                 inclusive_start_primary_key, exclusive_end_primary_key,
-    #                 columns_to_get, limit
-    #     )
-    #     return consumed, next_start_primary_key, row_list
+    def get_range(self, table_name, direction,
+                  inclusive_start_primary_key,
+                  exclusive_end_primary_key,
+                  columns_to_get=None, limit=None):
+        api_name = 'GetRange'
+        self.protocol_class.encoder.encoder_request()
+        proto = self.encoder.encode_request(api_name, *args, **kwargs)
+        body = proto.SerializeToString()
+
+        query = '/' + api_name
+        query, reqheaders, reqbody = self.protocol.make_request(
+            api_name, *args, **kwargs
+        )
+
+        retry_times = 0
+
+        while True:
+
+            try:
+                status, reason, resheaders, resbody = self.connection.send_receive(
+                    query, reqheaders, reqbody
+                )
+                self.protocol.handle_error(api_name, query, status, reason, resheaders, resbody)
+                break
+
+            except OTSServiceError as e:
+
+                if self.retry_policy.should_retry(retry_times, e, api_name):
+                    retry_delay = self.retry_policy.get_retry_delay(retry_times, e, api_name)
+                    time.sleep(retry_delay)
+                    retry_times += 1
+                else:
+                    raise e
+
+        ret = self.protocol.parse_response(api_name, status, resheaders, resbody)
+
+        return ret
+        (consumed, next_start_primary_key, row_list) = self._request_helper(
+                    'GetRange', table_name, direction,
+                    inclusive_start_primary_key, exclusive_end_primary_key,
+                    columns_to_get, limit
+        )
+        return consumed, next_start_primary_key, row_list
 
 if __name__ == "__main__":
     pass
